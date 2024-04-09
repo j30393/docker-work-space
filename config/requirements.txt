@@ -1,12 +1,28 @@
+# Python dependencies required for development
+astunparse
+expecttest!=0.2.0
+hypothesis
+numpy
+psutil
+pyyaml
+setuptools
+types-dataclasses
+sympy
+filelock
+networkx
+jinja2
+fsspec
+# setuptools was removed from default python install
+setuptools ; python_version >= "3.12"
+packaging
+optree>=0.9.1
+lark
 ipython
 jupyter
 onnxruntime
 requests>=2.31
 typing-extensions>=4.8.0
 ipykernel==6.29.0
-torch==2.2.0+cpu; platform_machine == 'x86_64' or platform_machine == 'amd64'
-torchvision==0.17.0+cpu; platform_machine == 'x86_64' or platform_machine == 'amd64'
-torch==2.2.0; platform_machine == 'aarch64' or platform_machine == 'arm64'
 torchvision==0.17.0; platform_machine == 'aarch64' or platform_machine == 'arm64'
 torchaudio==2.2.0
 onnx==1.13.1
@@ -20,3 +36,7 @@ tf2onnx==1.16.1
 tensorflow-cpu-aws==2.15.1; platform_system == "Linux" and (platform_machine == "arm64" or platform_machine == "aarch64")
 tensorflow==2.15.1; platform_machine == 'x86_64' or platform_machine == 'amd64'
 torch_tb_profiler==0.4.3
+matplotlib==3.6.2
+Pillow==9.3.0
+tqdm==4.64.1
+wandb==0.13.5
