@@ -1,5 +1,8 @@
 # Docker Workspace for ACAL/Playlab Curriculum
-A dockerized [Ubuntu 20.04](https://hub.docker.com/_/ubuntu/) workspace with all required tools installed for students to enjoy the journey of the ACAL/Playlab curriculum.
+A dockerized [Ubuntu 22.04](https://hub.docker.com/_/ubuntu/)
+
+## test environment
+windows 10 with wsl2 built with ubuntu 22.04
 
 ## User Guides
 - If you are working on Windows systems, use the following commands in Bash-like shells such as [Git Bash](https://git-scm.com/download/win).
