@@ -1,19 +1,36 @@
 # install python packages
-ARG BASE_IMAGE=ubuntu:22.04
-FROM ubuntu:22.04 AS python_pkg_provider
+FROM nvidia/cuda:12.4.0-base-ubuntu22.04
 RUN apt-get -qq update && \
     apt-get -qq install python3 python3-pip build-essential
-COPY ./config/requirements.txt /tmp/requirements.txt
-RUN pip3 install --upgrade pip wheel && \
-    pip3 install --user -r /tmp/requirements.txt -f "https://download.pytorch.org/whl/torch_stable.html"
 
-# main stage
-FROM ubuntu:22.04 AS base
-ARG PYTHON_VERSION=3.11
+# install python libraries
+RUN pip3 install --upgrade pip wheel
 
+ARG UID=1000
+ARG GID=1000
 ARG USERNAME="user"
 ARG TZ="Asia/Taipei"
 
+# reference from https://github.com/ContinuumIO/docker-images/blob/main/miniconda3/debian/Dockerfile
+# also from https://github.com/anibali/docker-pytorch
+# the template steam from playlab
+ENV INSTALLATION_TOOLS apt-utils \
+    bzip2 \
+    ca-certificates \
+    git \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    mercurial \
+    openssh-client \
+    procps \
+    subversion \
+    wget \
+    sudo \
+    curl \
+    wget \
+    software-properties-common
 
 ENV DEVELOPMENT_PACKAGES python3 \
     python3-pip \
@@ -27,130 +44,63 @@ ENV DEVELOPMENT_PACKAGES python3 \
 
 ENV TOOL_PACKAGES bash \
     dos2unix \
+    git \
     locales \
     nano \
     tree \
     vim \
     emacs
 
-FROM ${BASE_IMAGE} as dev-base
-
-
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl
-
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        build-essential \
-        ca-certificates \
-        ccache \
-        cmake \
-        git \
-        libjpeg-dev \
-        apt-utils \
-        sudo \
-        wget \
-        software-properties-common \
-        libpng-dev && \
-    apt-get -qq update && \
-    apt-get -qq upgrade && \
-    apt-get -qq install -y ${DEVELOPMENT_PACKAGES} ${TOOL_PACKAGES} && \
-    rm -rf /var/lib/apt/lists/*
-
-
-RUN /usr/sbin/update-ccache-symlinks
-RUN mkdir /opt/ccache && ccache --set-config=cache_dir=/opt/ccache
-ENV PATH /opt/conda/bin:$PATH
-
-FROM dev-base as conda
-ARG PYTHON_VERSION=3.11
-# Automatically set by buildx
-ARG TARGETPLATFORM
-# translating Docker's TARGETPLATFORM into miniconda arches
-RUN case ${TARGETPLATFORM} in \
-         "linux/arm64")  MINICONDA_ARCH=aarch64  ;; \
-         *)              MINICONDA_ARCH=x86_64   ;; \
-    esac && \
-    curl -fsSL -v -o ~/miniconda.sh -O  "https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-${MINICONDA_ARCH}.sh"
-
-# Manually invoke bash on miniconda script per https://github.com/conda/conda/issues/10431
-RUN chmod +x ~/miniconda.sh && \
-    bash ~/miniconda.sh -b -p /opt/conda && \
-    rm ~/miniconda.sh && \
-    /opt/conda/bin/conda install -y python=${PYTHON_VERSION} cmake conda-build pyyaml numpy ipython && \
-    /opt/conda/bin/conda clean -ya
-
-FROM dev-base as submodule-update
-WORKDIR /opt/pytorch
-COPY . .
-RUN git submodule update --init --recursive
-
-FROM conda as build
-ARG CMAKE_VARS
-WORKDIR /opt/pytorch
-COPY --from=conda /opt/conda /opt/conda
-COPY --from=submodule-update /opt/pytorch /opt/pytorch
-RUN make triton
-RUN --mount=type=cache,target=/opt/ccache \
-    export eval ${CMAKE_VARS} && \
-    TORCH_CUDA_ARCH_LIST="7.0 7.2 7.5 8.0 8.6 8.7 8.9 9.0 9.0a" TORCH_NVCC_FLAGS="-Xfatbin -compress-all" \
-    CMAKE_PREFIX_PATH="$(dirname $(which conda))/../" \
-    python setup.py install
-
-FROM conda as conda-installs
-ARG PYTHON_VERSION=3.11
-ARG CUDA_VERSION=12.1
-ARG CUDA_CHANNEL=nvidia
-ARG INSTALL_CHANNEL=pytorch-nightly
-# Automatically set by buildx
-# Note conda needs to be pinned to 23.5.2 see: https://github.com/pytorch/pytorch/issues/106470
-RUN /opt/conda/bin/conda install -c "${INSTALL_CHANNEL}" -y python=${PYTHON_VERSION} conda=23.5.2
-ARG TARGETPLATFORM
-
-# On arm64 we can only install wheel packages.
-RUN case ${TARGETPLATFORM} in \
-         "linux/arm64")  pip install --extra-index-url https://download.pytorch.org/whl/cpu/ torch torchvision torchaudio ;; \
-         *)              /opt/conda/bin/conda install -c "${INSTALL_CHANNEL}" -c "${CUDA_CHANNEL}" -y "python=${PYTHON_VERSION}" pytorch torchvision torchaudio "pytorch-cuda=$(echo $CUDA_VERSION | cut -d'.' -f 1-2)"  ;; \
-    esac && \
-    /opt/conda/bin/conda clean -ya
-RUN /opt/conda/bin/pip install torchelastic
-
-FROM ${BASE_IMAGE} as official
-ARG PYTORCH_VERSION
-ARG TRITON_VERSION
-ARG TARGETPLATFORM
-ARG CUDA_VERSION
-LABEL com.nvidia.volumes.needed="nvidia_driver"
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        ca-certificates \
-        libjpeg-dev \
-        libpng-dev \
-        && rm -rf /var/lib/apt/lists/*
-COPY --from=conda-installs /opt/conda /opt/conda
-RUN if test -n "${TRITON_VERSION}" -a "${TARGETPLATFORM}" != "linux/arm64"; then \
-        DEBIAN_FRONTEND=noninteractive apt install -y --no-install-recommends gcc; \
-        rm -rf /var/lib/apt/lists/*; \
-    fi
-ENV PATH /opt/conda/bin:$PATH
-ENV NVIDIA_VISIBLE_DEVICES all
-ENV NVIDIA_DRIVER_CAPABILITIES compute,utility
-ENV LD_LIBRARY_PATH /usr/local/nvidia/lib:/usr/local/nvidia/lib64
-ENV PATH /usr/local/nvidia/bin:/usr/local/cuda/bin:$PATH
-ENV PYTORCH_VERSION ${PYTORCH_VERSION}
-
-
-
 ENV USER "${USERNAME}"
 ENV TERM xterm-256color
 ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE DontWarn
 
+# install system packages
+RUN apt-get -qq update && \
+    apt-get -qq install ${INSTALLATION_TOOLS} && \
+    # start install
+    apt-get -qq update && \
+    apt-get -qq upgrade && \
+    apt-get -qq install ${DEVELOPMENT_PACKAGES} ${TOOL_PACKAGES} \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
 # set env var JAVA_HOME
 ENV JAVA_HOME "/usr/lib/jvm/java-8-openjdk-*"
 
+
+# install conda
+ARG TARGETARCH
+RUN if [ [ "${TARGETARCH}" = "arm64" ] ]; then \
+     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -O /tmp/miniconda.sh; \
+     else \
+     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh; \
+     fi
+RUN /bin/bash /tmp/miniconda.sh -b -p /opt/conda && \
+    rm /tmp/miniconda.sh && \
+    echo "export PATH=/opt/conda/bin:$PATH" > /etc/profile.d/conda.sh
+ENV PATH /opt/conda/bin:$PATH
+
+# install python libraries
+SHELL ["/bin/bash", "--login", "-c"]
+COPY ./config/conda_requirements.txt /tmp/requirements.txt
+# from https://blog.csdn.net/weixin_41978699/article/details/122294459
+# setup tensorflow virtualenv
+RUN conda create -n torch -y python=3.11;
+# from https://pythonspeed.com/articles/activate-conda-dockerfile/
+SHELL ["conda", "run", "--no-capture-output", "-n", "torch", "/bin/bash", "-c"]
+RUN conda init torch; \
+    conda activate torch; \
+    pip3 install --upgrade pip && \
+    pip3 install -r /tmp/requirements.txt; \
+    conda deactivate; \
+    rm /tmp/requirements.txt
+
+# Add alias for jupyter commands
+RUN echo "alias run-jupyter=\"jupyter notebook --NotebookApp.iopub_data_rate_limit=1.0e10 --ip 0.0.0.0 --port 8888 --no-browser --allow-root >jupyter.stdout.log &>jupyter.stderr.log &\" " >> /opt/conda/etc/profile.d/conda.sh
+
 # setup time zone
 RUN ln -snf /usr/share/zoneinfo/${TZ} /etc/localtime && echo ${TZ} > /etc/timezone
-
-WORKDIR /home
-RUN apt-get clean && apt-get update && apt-get install -y locales dos2unix
-RUN touch /etc/locale.gen
 
 # add support of locale zh_TW
 RUN sed -i 's/# en_US.UTF-8/en_US.UTF-8/g' /etc/locale.gen && \
@@ -160,12 +110,7 @@ RUN sed -i 's/# en_US.UTF-8/en_US.UTF-8/g' /etc/locale.gen && \
     dpkg-reconfigure --frontend=noninteractive locales && \
     update-locale LANG=en_US.UTF-8 && \
     update-locale LC_ALL=en_US.UTF-8
-ENV LC_ALL en_US.UTF-8
 
-ARG UID=1000
-ARG GID=1000
-ARG USERNAME="user"
-RUN mkdir /etc/sudoers.d
 # add non-root user account
 RUN groupadd -o -g ${GID} "${USERNAME}" && \
     useradd -u ${UID} -m -s /bin/bash -g ${GID} "${USERNAME}" && \
@@ -191,9 +136,7 @@ RUN mkdir -p /home/"${USERNAME}"/.ssh && \
     mkdir -p /home/"${USERNAME}"/.local
 RUN chown -R ${UID}:${GID} /home/"${USERNAME}"
 
-# install python libraries
-RUN pip3 install --upgrade pip wheel
-COPY --from=python_pkg_provider --chown=${UID}:${GID} /root/.local /home/"${USERNAME}"/.local
+
 
 ENV PATH="${PATH}:/home/${USERNAME}/.local/bin"
 
@@ -204,4 +147,5 @@ USER "${USERNAME}"
 
 WORKDIR /home/"${USERNAME}"
 
-CMD [ "bash", "/docker/start.sh" ]
+
+
