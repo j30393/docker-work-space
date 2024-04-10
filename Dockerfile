@@ -76,6 +76,7 @@ RUN if [ [ "${TARGETARCH}" = "arm64" ] ]; then \
      else \
      wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh; \
      fi
+
 RUN /bin/bash /tmp/miniconda.sh -b -p /opt/conda && \
     rm /tmp/miniconda.sh && \
     echo "export PATH=/opt/conda/bin:$PATH" > /etc/profile.d/conda.sh
@@ -147,5 +148,5 @@ USER "${USERNAME}"
 
 WORKDIR /home/"${USERNAME}"
 
-
+CMD [ "bash", "/docker/start.sh" ]
 
