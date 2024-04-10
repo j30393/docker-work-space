@@ -4,9 +4,6 @@ onnxruntime
 requests>=2.31
 typing-extensions>=4.8.0
 ipykernel==6.29.0
-torch==2.2.1;
-torchvision==0.17.1;
-torchaudio==2.2.1
 onnx==1.13.1
 netron==7.4.1
 transformers==4.37.2

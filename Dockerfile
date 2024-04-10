@@ -1,4 +1,5 @@
 # install python packages
+# https://github.com/iot-salzburg/gpu-jupyter
 FROM nvidia/cuda:12.4.0-base-ubuntu22.04
 RUN apt-get -qq update && \
     apt-get -qq install python3 python3-pip build-essential
@@ -93,6 +94,7 @@ SHELL ["conda", "run", "--no-capture-output", "-n", "torch", "/bin/bash", "-c"]
 RUN conda init torch; \
     conda activate torch; \
     pip3 install --upgrade pip && \
+    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118 &&\
     pip3 install -r /tmp/requirements.txt; \
     conda deactivate; \
     rm /tmp/requirements.txt

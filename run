@@ -54,6 +54,7 @@ start_environment() {
             -v "$([[ ${OSTYPE} == "msys" ]] && echo "/${VOLUME_SSH_DIR}" || echo "${VOLUME_SSH_DIR}")":"/home/${USERNAME}/.ssh/" \
             -v "$([[ ${OSTYPE} == "msys" ]] && echo "/${VOLUME_VSCODESERVER_DIR}" || echo "${VOLUME_VSCODESERVER_DIR}")":"/home/${USERNAME}/.vscode-server/" \
             --hostname "$(echo "${CONTAINER_NAME}" | tr '[:lower:]' '[:upper:]')" \
+            --gpus all \
             --name "${CONTAINER_NAME}" \
             "${IMAGE_NAME}" ||
             { echo "error due to docker run image" && exit 1; }
