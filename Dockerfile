@@ -82,8 +82,8 @@ ENV JAVA_HOME "/usr/lib/jvm/java-8-openjdk-*"
 
 RUN git clone --branch v0.1.0 https://github.com/pytorch/executorch.git
 RUN cd executorch && git submodule sync && git submodule update --init
-RUN mkdir -p /home/${USERNAME}/projects/executorch
-RUN cd .. && cp -r executorch/ /home/${USERNAME}/projects/executorch
+RUN mkdir -p /home/${USERNAME}/projects
+
 
 # install conda
 ARG TARGETARCH
@@ -93,9 +93,16 @@ RUN if [ [ "${TARGETARCH}" = "arm64" ] ]; then \
     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh; \
     fi
 
-RUN /bin/bash /tmp/miniconda.sh -b -p /opt/conda && \
-    rm /tmp/miniconda.sh && \
-    echo "export PATH=/opt/conda/bin:$PATH" > /etc/profile.d/conda.sh
+RUN /bin/bash /tmp/miniconda.sh -b -p /opt/conda
+
+RUN set -x && \
+    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
+    echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
+    echo "conda activate base" >> ~/.bashrc && \
+    find /opt/conda/ -follow -type f -name '*.a' -delete && \
+    find /opt/conda/ -follow -type f -name '*.js.map' -delete && \
+    /opt/conda/bin/conda clean -afy
+
 ENV PATH /opt/conda/bin:$PATH
 
 # install python libraries
@@ -108,7 +115,7 @@ RUN conda create -n torch -y python=3.10;
 
 # from https://pythonspeed.com/articles/activate-conda-dockerfile/
 SHELL ["conda", "run", "--no-capture-output", "-n", "torch", "/bin/bash", "-c"]
-RUN source activate torch; \
+RUN conda activate torch; \
     conda install cmake && \
     pip3 install --upgrade pip && \
     pip3 install torch torchvision torchaudio &&\
@@ -152,13 +159,16 @@ RUN dos2unix -ic "/home/${USERNAME}/.bashrc" | xargs dos2unix && \
 # user account configuration
 RUN mkdir -p /home/"${USERNAME}"/.ssh && \
     mkdir -p /home/"${USERNAME}"/.vscode-server && \
-    mkdir -p /home/"${USERNAME}"/projects && \
     mkdir -p /home/"${USERNAME}"/.local
 RUN chown -R ${UID}:${GID} /home/"${USERNAME}"
 
-WORKDIR /home/${USERNAME}/projects/executorch
+WORKDIR /home/${USERNAME}/projects
+RUN cp -r /executorch/ /home/${USERNAME}/projects
+RUN pwd && ls -alhs
+WORKDIR /home/${USERNAME}/projects/executorchls
 #build environment for executorch
 RUN conda create -yn executorch python=3.10.0;
+
 RUN source activate executorch; \
     conda install cmake && \
     ./install_requirements.sh 2>/dev/null || true && \
