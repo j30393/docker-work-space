@@ -35,6 +35,7 @@ start_environment() {
             --build-arg UID="$(id -u)" \
             --build-arg GID="$(id -g)" \
             --build-arg USERNAME="${USERNAME}" \
+            --progress plain \
             -t "${IMAGE_NAME}" . ||
             { echo "error due to docker build image" && exit 1; }
     fi

@@ -87,19 +87,21 @@ ENV PATH /opt/conda/bin:$PATH
 SHELL ["/bin/bash", "--login", "-c"]
 COPY ./config/conda_requirements.txt /tmp/requirements.txt
 # from https://blog.csdn.net/weixin_41978699/article/details/122294459
-# setup tensorflow virtualenv
-RUN conda create -n torch -y python=3.11;
+# setup pytorch virtualenv
+# downgrade to fit the tutorial for EXECUTORCH
+RUN conda create -n torch -y python=3.10;
+
 # from https://pythonspeed.com/articles/activate-conda-dockerfile/
 SHELL ["conda", "run", "--no-capture-output", "-n", "torch", "/bin/bash", "-c"]
-RUN conda init torch; \
-    conda activate torch; \
+RUN source activate torch; \
+    conda install cmake && \
     pip3 install --upgrade pip && \
-    pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118 &&\
+    pip3 install torch torchvision torchaudio &&\
     pip3 install -r /tmp/requirements.txt; \
     conda deactivate; \
     rm /tmp/requirements.txt
 
-# Add alias for jupyter commands
+
 RUN echo "alias run-jupyter=\"jupyter notebook --NotebookApp.iopub_data_rate_limit=1.0e10 --ip 0.0.0.0 --port 8888 --no-browser --allow-root >jupyter.stdout.log &>jupyter.stderr.log &\" " >> /opt/conda/etc/profile.d/conda.sh
 
 # setup time zone
@@ -139,7 +141,19 @@ RUN mkdir -p /home/"${USERNAME}"/.ssh && \
     mkdir -p /home/"${USERNAME}"/.local
 RUN chown -R ${UID}:${GID} /home/"${USERNAME}"
 
+#build environment for executorch
+RUN conda create -yn executorch python=3.10.0;
+RUN source activate executorch; \
+    conda install cmake && \
+    pip3 install --upgrade pip && \
+    git clone --branch v0.1.0 https://github.com/pytorch/executorch.git && \
+    cd executorch && \
+    git submodule sync && \
+    git submodule update --init &&\
+    ./install_requirements.sh 2>/dev/null || true &&\
+    conda deactivate;
 
+ENV PATH="/executorch/third-party/flatbuffers/cmake-out:${PATH}"
 
 ENV PATH="${PATH}:/home/${USERNAME}/.local/bin"
 
@@ -147,8 +161,6 @@ ENV PATH="${PATH}:/home/${USERNAME}/.local/bin"
 EXPOSE 10000
 
 USER "${USERNAME}"
-
 WORKDIR /home/"${USERNAME}"
-
 CMD [ "bash", "/docker/start.sh" ]
 
