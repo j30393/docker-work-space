@@ -31,6 +31,7 @@ ENV INSTALLATION_TOOLS apt-utils \
     sudo \
     curl \
     wget \
+    zstd \
     software-properties-common
 
 ENV DEVELOPMENT_PACKAGES python3 \
@@ -66,17 +67,31 @@ RUN apt-get -qq update && \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# env for the executorch, not we only specified the 7_18 version since the latest version failed = =
+RUN apt-get -qq update && \
+    apt-get -qq install clang && \
+    wget https://github.com/facebook/buck2/releases/download/2023-07-18/buck2-x86_64-unknown-linux-musl.zst && \
+    zstd -cdq buck2-x86_64-unknown-linux-musl.zst  > /tmp/buck2 && chmod +x /tmp/buck2 && \
+    mv /tmp/buck2 /usr/local/bin/buck2 && \
+    rm -rf /tmp/buck2 && \
+    apt-get clean
+
+
 # set env var JAVA_HOME
 ENV JAVA_HOME "/usr/lib/jvm/java-8-openjdk-*"
 
+RUN git clone --branch v0.1.0 https://github.com/pytorch/executorch.git
+RUN cd executorch && git submodule sync && git submodule update --init
+RUN mkdir -p /home/${USERNAME}/projects/executorch
+RUN cd .. && cp -r executorch/ /home/${USERNAME}/projects/executorch
 
 # install conda
 ARG TARGETARCH
 RUN if [ [ "${TARGETARCH}" = "arm64" ] ]; then \
-     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -O /tmp/miniconda.sh; \
-     else \
-     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh; \
-     fi
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -O /tmp/miniconda.sh; \
+    else \
+    wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh; \
+    fi
 
 RUN /bin/bash /tmp/miniconda.sh -b -p /opt/conda && \
     rm /tmp/miniconda.sh && \
@@ -141,19 +156,15 @@ RUN mkdir -p /home/"${USERNAME}"/.ssh && \
     mkdir -p /home/"${USERNAME}"/.local
 RUN chown -R ${UID}:${GID} /home/"${USERNAME}"
 
+WORKDIR /home/${USERNAME}/projects/executorch
 #build environment for executorch
 RUN conda create -yn executorch python=3.10.0;
 RUN source activate executorch; \
     conda install cmake && \
+    ./install_requirements.sh 2>/dev/null || true && \
     pip3 install --upgrade pip && \
-    git clone --branch v0.1.0 https://github.com/pytorch/executorch.git && \
-    cd executorch && \
-    git submodule sync && \
-    git submodule update --init &&\
-    ./install_requirements.sh 2>/dev/null || true &&\
-    conda deactivate;
-
-ENV PATH="/executorch/third-party/flatbuffers/cmake-out:${PATH}"
+    conda deactivate
+WORKDIR /
 
 ENV PATH="${PATH}:/home/${USERNAME}/.local/bin"
 
