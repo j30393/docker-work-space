@@ -85,6 +85,7 @@ RUN cd executorch && git submodule sync && git submodule update --init
 RUN mkdir -p /home/${USERNAME}/projects
 
 
+
 # install conda
 ARG TARGETARCH
 RUN if [ [ "${TARGETARCH}" = "arm64" ] ]; then \
@@ -162,10 +163,9 @@ RUN mkdir -p /home/"${USERNAME}"/.ssh && \
     mkdir -p /home/"${USERNAME}"/.local
 RUN chown -R ${UID}:${GID} /home/"${USERNAME}"
 
-WORKDIR /home/${USERNAME}/projects
-RUN cp -r /executorch/ /home/${USERNAME}/projects
-RUN pwd && ls -alhs
-WORKDIR /home/${USERNAME}/projects/executorchls
+RUN cp -r /executorch/ /home/${USERNAME}
+WORKDIR /home/${USERNAME}/executorch
+RUN ls -alhs
 #build environment for executorch
 RUN conda create -yn executorch python=3.10.0;
 
@@ -176,6 +176,12 @@ RUN source activate executorch; \
     conda deactivate
 WORKDIR /
 
+WORKDIR /home/${USERNAME}/executorch
+RUN ls -alhs
+WORKDIR /
+# this may take time
+RUN chmod -R 777 /home/${USERNAME}/executorch
+ENV PATH="/home/${USERNAME}/executorch/third-party/flatbuffers/cmake-out:${PATH}"
 ENV PATH="${PATH}:/home/${USERNAME}/.local/bin"
 
 # TensorBoard setup
