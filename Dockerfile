@@ -30,7 +30,7 @@ ENV INSTALLATION_TOOLS apt-utils \
     wget \
     sudo \
     curl \
-    wget \
+    lld \
     zstd \
     software-properties-common
 
