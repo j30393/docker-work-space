@@ -51,7 +51,8 @@ ENV TOOL_PACKAGES bash \
     nano \
     tree \
     vim \
-    emacs
+    emacs \
+    unzip
 
 ENV USER "${USERNAME}"
 ENV TERM xterm-256color
@@ -169,11 +170,14 @@ RUN ls -alhs
 #build environment for executorch
 RUN conda create -yn executorch python=3.10.0;
 
+COPY ./config/executorch_requirements.txt /tmp/requirements.txt
 RUN source activate executorch; \
     conda install cmake && \
     ./install_requirements.sh 2>/dev/null || true && \
+    pip3 install -r /tmp/requirements.txt;\
     pip3 install --upgrade pip && \
-    conda deactivate
+    conda deactivate; \
+    rm /tmp/requirements.txt
 WORKDIR /
 
 WORKDIR /home/${USERNAME}/executorch
