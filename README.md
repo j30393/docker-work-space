@@ -5,7 +5,7 @@ A dockerized [Ubuntu 22.04](https://hub.docker.com/_/ubuntu/)
 windows 10 with wsl2 built with ubuntu 22.04
 
 ## some must say
-This docker may not be useful on other architecture, for example : I install thehttps://github.com/facebook/buck2/releases/download/2023-07-18/buck2-x86_64-unknown-linux-musl.zst. Since I don't have other machine to test!
+This docker may not be useful on other architecture, for example : I install the https://github.com/facebook/buck2/releases/download/2023-07-18/buck2-x86_64-unknown-linux-musl.zst. Since I don't have other machine to test!
 
 ## User Guides
 - If you are working on Windows systems, use the following commands in Bash-like shells such as [Git Bash](https://git-scm.com/download/win).
